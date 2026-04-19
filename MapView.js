@@ -3,6 +3,15 @@ import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Controls from "./Controls";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+const DefaultIcon = L.icon({
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 // 🔥 STATIC ROUTES
 const routes = {
