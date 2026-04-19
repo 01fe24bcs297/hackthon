@@ -1,20 +1,7 @@
-{
-  "name": "frontend",
-  "version": "0.1.0",
-  "private": true,
-  "homepage": "https://01fe24bcs297.github.io/hackthon",
-  "dependencies": {
-    "leaflet": "^1.9.4",
-    "react-leaflet": "^5.0.0",
-    "react-router-dom": "^7.14.1",
-    "react-scripts": "5.0.1"
-  },
+"homepage": "https://01fe24bcs297.github.io/hackthon",
 "scripts": {
   "start": "react-scripts start",
   "build": "react-scripts build",
-  "test": "react-scripts test",
-  "eject": "react-scripts eject",
   "predeploy": "npm run build",
   "deploy": "gh-pages -d build"
-}
 }
