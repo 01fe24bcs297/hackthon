@@ -4,32 +4,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Controls from "./Controls";
 
-// 🔥 OSRM ROUTE (REAL ROAD PATH)
-const getRoadRoute = async (points) => {
-  if (points.length < 2) return [];
-
-  const coords = points.map(p => `${p[1]},${p[0]}`).join(";");
-
-  try {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`
-    );
-
-    const data = await res.json();
-
-    if (data.routes && data.routes.length > 0) {
-      return data.routes[0].geometry.coordinates.map(coord => [
-        coord[1],
-        coord[0]
-      ]);
-    }
-  } catch (err) {
-    console.log("OSRM ERROR:", err);
-  }
-
-  return [];
-};
-
+// 🔥 STATIC ROUTES
 const routes = {
   "KLE-Unkal": [
     [15.3687, 75.1231],
@@ -52,19 +27,13 @@ const routes = {
 function MapView() {
   const [routeKey, setRouteKey] = useState("KLE-Unkal");
   const [route, setRoute] = useState(routes["KLE-Unkal"]);
-
   const [position, setPosition] = useState(route[0]);
   const [path, setPath] = useState([]);
-  const [cleanRoute, setCleanRoute] = useState([]);
-
-  const [status, setStatus] = useState("Loading...");
+  const [status, setStatus] = useState("🟢 Demo Mode");
   const [eta, setEta] = useState("--");
-
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const positionRef = useRef(position);
   const animationRef = useRef(null);
-  const routeRequestRef = useRef(0);
 
   positionRef.current = position;
 
@@ -93,6 +62,7 @@ function MapView() {
     }, 60);
   };
 
+  // 🚌 BUS ICON
   const icon = new L.DivIcon({
     html: `<div style="
       width:30px;height:30px;background:#007bff;
@@ -108,119 +78,30 @@ function MapView() {
     setRoute(newRoute);
     setPosition(newRoute[0]);
     setPath([]);
-    setCleanRoute([]);
   }, [routeKey]);
 
-  // 🌐 NETWORK DETECTION
+  // 🚀 DEMO MOVEMENT (NO BACKEND)
   useEffect(() => {
-    const online = () => setIsOnline(true);
-    const offline = () => setIsOnline(false);
-
-    window.addEventListener("online", online);
-    window.addEventListener("offline", offline);
-
-    return () => {
-      window.removeEventListener("online", online);
-      window.removeEventListener("offline", offline);
-    };
-  }, []);
-
-  // 🚀 SEND DATA
-  useEffect(() => {
-    let timeout;
     let index = 0;
 
-    const send = async () => {
-      const current = route[index];
+    const interval = setInterval(() => {
+      const newPos = route[index];
       index = (index + 1) % route.length;
 
-      try {
-        await fetch("http://127.0.0.1:5000/api/location", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lat: current[0],
-            lng: current[1],
-            timestamp: Date.now(),
-            networkStatus: isOnline ? "good" : "low"
-          })
-        });
-      } catch (err) {
-        console.log("POST ERROR:", err);
-      }
+      smoothMove(positionRef.current, newPos);
 
-      timeout = setTimeout(send, 3000);
-    };
+      setPath(prev => [...prev, newPos].slice(-10));
 
-    send();
-    return () => clearTimeout(timeout);
-  }, [route, isOnline]);
+      // Fake ETA
+      const randomEta = Math.floor(Math.random() * 300);
+      const m = Math.floor(randomEta / 60);
+      const s = randomEta % 60;
+      setEta(`${m} min ${s} sec`);
 
-  // 🔥 CLEAN ROUTE UPDATE
-  const updateCleanRoute = async (points) => {
-    const requestId = ++routeRequestRef.current;
-
-    const route = await getRoadRoute(points);
-
-    if (requestId !== routeRequestRef.current) return;
-
-    if (route.length > 0) {
-      setCleanRoute(route);
-    }
-  };
-
-  // 🚀 FETCH DATA (DYNAMIC SPEED)
-  useEffect(() => {
-    let interval;
-
-    const fetchData = async () => {
-      try {
-        const res = await fetch("http://127.0.0.1:5000/api/location");
-        const data = await res.json();
-
-        if (!data.lat || !data.lng) {
-          setStatus("🟡 Waiting...");
-          return;
-        }
-
-        const newPos = [data.lat, data.lng];
-
-        smoothMove(positionRef.current, newPos);
-
-        setPath(prev => {
-          const updated = [...prev, newPos];
-          const trimmed = updated.slice(-6);
-
-          if (trimmed.length >= 3) {
-            updateCleanRoute(trimmed);
-          }
-
-          return trimmed;
-        });
-
-        setStatus(
-          data.networkStatus === "low"
-            ? "🟡 Weak Network"
-            : "🟢 Live Tracking"
-        );
-
-        if (data.eta !== undefined) {
-          const m = Math.floor(data.eta / 60);
-          const s = data.eta % 60;
-          setEta(`${m} min ${s} sec`);
-        }
-
-      } catch (err) {
-        console.log("FETCH ERROR:", err);
-        setStatus("🔴Server Offline");
-      }
-    };
-
-    const delay = isOnline ? 3000 : 8000;
-    interval = setInterval(fetchData, delay);
+    }, 3000);
 
     return () => clearInterval(interval);
-  }, [isOnline]);
+  }, [route]);
 
   return (
     <div style={{ height: "100vh", width: "100%" }}>
@@ -229,22 +110,20 @@ function MapView() {
         eta={eta}
         status={status}
         routeKey={routeKey}
-        isOnline={isOnline}
+        isOnline={true}
       />
 
       <MapContainer
         center={position}
         zoom={14}
-        style={{ height: "100%" }}
-        whenCreated={(map) => {
-          map.flyTo(position, 14);
-        }}
+        style={{ height: "100vh", width: "100%" }}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
         <Marker position={position} icon={icon} />
 
-        {/* ✅ ONLY ONE CLEAN ROUTE */}
-        <Polyline positions={cleanRoute} color="blue" weight={5} />
+        {/* Route Path */}
+        <Polyline positions={path} color="blue" weight={5} />
       </MapContainer>
     </div>
   );
