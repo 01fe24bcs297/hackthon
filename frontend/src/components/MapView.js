@@ -1,4 +1,3 @@
-Copy
 
 import React, { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
